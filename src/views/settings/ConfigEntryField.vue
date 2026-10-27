@@ -251,27 +251,61 @@
       @click:clear="onClear"
     />
 
-    <!-- multi-value string combobox -->
-    <v-combobox
+    <!-- multi-value string: individual inputs with per-row remove and a trailing add -->
+    <!-- confEntry.format, when set on a multi-value STRING, is the per-input placeholder (template hint) -->
+    <div
       v-else-if="
         confEntry.type == ConfigEntryType.STRING && confEntry.multi_value
       "
-      :model-value="confEntry.value as string[]"
-      :menu-props="{ zIndex: 10000 }"
-      multiple
-      chips
-      :clearable="true"
-      :disabled="isFieldDisabled"
-      :label="displayLabel()"
-      :required="confEntry.required"
-      :rules="[
-        (v) => !(!v && confEntry.required) || $t('settings.invalid_input'),
-      ]"
-      variant="outlined"
-      density="comfortable"
-      @update:model-value="onUpdateValue($event)"
-      @click:clear="onClear"
-    />
+      class="config-multi-string"
+    >
+      <v-label class="config-multi-string-label">
+        {{ displayLabel() }}
+      </v-label>
+      <div
+        v-for="(item, idx) in multiStringEntries"
+        :key="idx"
+        class="config-multi-string-row"
+      >
+        <v-text-field
+          :model-value="item"
+          :placeholder="confEntry.format ?? ''"
+          :disabled="isFieldDisabled"
+          variant="outlined"
+          density="comfortable"
+          hide-details
+          @update:model-value="setMultiStringAt(idx, $event)"
+        />
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          size="small"
+          :disabled="isFieldDisabled"
+          :aria-label="$t('tooltip.delete')"
+          @click="removeMultiStringAt(idx)"
+        />
+      </div>
+      <div class="config-multi-string-row">
+        <v-text-field
+          :model-value="multiStringDraft"
+          :placeholder="confEntry.format ?? ''"
+          :disabled="isFieldDisabled"
+          variant="outlined"
+          density="comfortable"
+          hide-details
+          @update:model-value="multiStringDraft = $event"
+          @keyup.enter="commitMultiStringDraft"
+          @blur="commitMultiStringDraft"
+        />
+        <v-btn
+          icon="mdi-plus"
+          variant="text"
+          size="small"
+          :disabled="isFieldDisabled || !multiStringDraft"
+          @click="commitMultiStringDraft"
+        />
+      </div>
+    </div>
 
     <!-- all other: textbox with single value -->
     <v-text-field
@@ -324,7 +358,7 @@ import {
 } from "@/helpers/config_entry_ui";
 import { HASS_DOMAIN } from "@/helpers/hass_controls";
 import { $t } from "@/plugins/i18n";
-import { computed } from "vue";
+import { computed, ref } from "vue";
 
 const props = defineProps<{
   confEntry: ConfigEntryUI;
@@ -402,6 +436,46 @@ const onUpdateValue = (value: ConfigValueType) => {
 
 const onClear = () => {
   emit("update:value", null);
+};
+
+// Multi-value STRING helpers: render each existing entry as its own editable input
+// with a per-row remove button, plus one trailing input + add button for new entries.
+// confEntry.format, when set on a multi-value STRING, is the per-input placeholder.
+const multiStringEntries = computed<string[]>(() => {
+  const v = props.confEntry.value;
+  if (Array.isArray(v)) {
+    return v.map((x) => (x == null ? "" : String(x)));
+  }
+  return [];
+});
+
+const multiStringDraft = ref("");
+
+const emitMultiStringValue = (next: string[]) => {
+  if (next.length === 0) {
+    emit("update:value", props.confEntry.default_value);
+  } else {
+    emit("update:value", next);
+  }
+};
+
+const setMultiStringAt = (idx: number, value: string | null | undefined) => {
+  const next = [...multiStringEntries.value];
+  next[idx] = value == null ? "" : value;
+  emitMultiStringValue(next);
+};
+
+const removeMultiStringAt = (idx: number) => {
+  const next = multiStringEntries.value.filter((_, i) => i !== idx);
+  emitMultiStringValue(next);
+};
+
+const commitMultiStringDraft = () => {
+  const v = multiStringDraft.value.trim();
+  if (!v) return;
+  const next = [...multiStringEntries.value, v];
+  emitMultiStringValue(next);
+  multiStringDraft.value = "";
 };
 
 const displayOptions = computed(() => {
@@ -511,5 +585,30 @@ const displayOptions = computed(() => {
   .config-slider-block {
     flex: 1;
   }
+}
+
+.config-multi-string {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.2);
+  border-radius: 4px;
+}
+
+.config-multi-string-label {
+  font-size: 0.75rem;
+  color: rgba(var(--v-theme-on-surface), 0.7);
+}
+
+.config-multi-string-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+}
+
+.config-multi-string-row :deep(.v-input) {
+  flex: 1;
 }
 </style>
