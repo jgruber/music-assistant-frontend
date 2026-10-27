@@ -274,6 +274,10 @@
           variant="outlined"
           density="comfortable"
           hide-details
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+          spellcheck="false"
           @update:model-value="setMultiStringAt(idx, $event)"
         />
         <v-btn
@@ -293,6 +297,10 @@
           variant="outlined"
           density="comfortable"
           hide-details
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+          spellcheck="false"
           @update:model-value="multiStringDraft = $event"
           @keyup.enter="commitMultiStringDraft"
           @blur="commitMultiStringDraft"
